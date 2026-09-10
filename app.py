@@ -766,13 +766,13 @@ def show_generated_resumes():
                 # Download buttons
                 st.markdown('<h4 class="section-header">⬇️ Download</h4>', unsafe_allow_html=True)
                 
-                col1, col2 = st.columns(2)
+                col1, col2, col3, col4 = st.columns(4)
                 
                 with col1:
                     if resume_path.exists():
                         with open(resume_path, "r") as f:
                             st.download_button(
-                                label="📥 Download Resume",
+                                label="📥 TXT",
                                 data=f.read(),
                                 file_name=f"resume_{resume['folder']}.txt",
                                 mime="text/plain",
@@ -780,15 +780,43 @@ def show_generated_resumes():
                             )
                 
                 with col2:
+                    if resume_path.exists():
+                        with open(resume_path, "r") as f:
+                            resume_content = f.read()
+                        from job_hunter.pdf_converter import pdf_converter
+                        pdf_bytes = pdf_converter.convert_text_to_pdf(resume_content)
+                        st.download_button(
+                            label="📄 PDF",
+                            data=pdf_bytes,
+                            file_name=f"resume_{resume['folder']}.pdf",
+                            mime="application/pdf",
+                            use_container_width=True
+                        )
+                
+                with col3:
                     if cover_letter_path.exists():
                         with open(cover_letter_path, "r") as f:
                             st.download_button(
-                                label="📥 Download Cover Letter",
+                                label="📥 TXT",
                                 data=f.read(),
                                 file_name=f"cover_letter_{resume['folder']}.txt",
                                 mime="text/plain",
                                 use_container_width=True
                             )
+                
+                with col4:
+                    if cover_letter_path.exists():
+                        with open(cover_letter_path, "r") as f:
+                            cover_letter_content = f.read()
+                        from job_hunter.pdf_converter import pdf_converter
+                        pdf_bytes = pdf_converter.convert_text_to_pdf(cover_letter_content)
+                        st.download_button(
+                            label="📄 PDF",
+                            data=pdf_bytes,
+                            file_name=f"cover_letter_{resume['folder']}.pdf",
+                            mime="application/pdf",
+                            use_container_width=True
+                        )
 
 def show_settings():
     """Show settings with professional styling"""
