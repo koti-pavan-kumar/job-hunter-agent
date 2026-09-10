@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  job-hunter:
+    build: .
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./job_hunter/data:/app/job_hunter/data
+      - ./job_hunter/resumes:/app/job_hunter/resumes
+      - ./job_hunter/logs:/app/job_hunter/logs
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped

@@ -1,0 +1,76 @@
+{
+  "preferences": {
+    "keywords": [
+      "AI",
+      "ML",
+      "Machine Learning",
+      "Python",
+      "Data Science",
+      "Internship"
+    ],
+    "locations": [
+      "Remote",
+      "Bangalore",
+      "Hyderabad",
+      "Pune"
+    ],
+    "job_type": "internship",
+    "remote": true,
+    "min_stipend": 0,
+    "max_applications_per_day": 10
+  },
+  "credentials": {
+    "linkedin_email": "",
+    "linkedin_password": "",
+    "naukri_email": "",
+    "naukri_password": "",
+    "internshala_email": "",
+    "internshala_password": ""
+  },
+  "resume_info": {
+    "name": "John Doe",
+    "email": "john.doe@email.com",
+    "phone": "+91 9876543210",
+    "linkedin_url": "linkedin.com/in/johndoe",
+    "github_url": "github.com/johndoe",
+    "portfolio_url": "johndoe.dev",
+    "summary": "Third-year CS student passionate about AI/ML with experience in Python and data science.",
+    "skills": [
+      "Python",
+      "Machine Learning",
+      "Deep Learning",
+      "TensorFlow",
+      "PyTorch",
+      "Data Analysis",
+      "SQL",
+      "Git"
+    ],
+    "experience": [],
+    "education": [
+      {
+        "degree": "Bachelor of Technology in Computer Science",
+        "institution": "ABC College of Engineering",
+        "year": "2022-2026",
+        "cgpa": "8.5"
+      }
+    ],
+    "projects": [
+      {
+        "title": "AI Chatbot",
+        "description": "Built an AI-powered chatbot using NLP and deep learning",
+        "technologies": "Python, TensorFlow, Flask",
+        "link": "github.com/johndoe/chatbot"
+      },
+      {
+        "title": "Movie Recommendation System",
+        "description": "Developed a recommendation engine using collaborative filtering",
+        "technologies": "Python, Pandas, Scikit-learn",
+        "link": "github.com/johndoe/recommender"
+      }
+    ],
+    "certifications": [
+      "Google AI/ML Certificate",
+      "AWS Cloud Practitioner"
+    ]
+  }
+}
