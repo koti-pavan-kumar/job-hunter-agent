@@ -134,11 +134,43 @@ st.markdown("""
     }
     
     [data-testid="stSidebar"] .stRadio > label {
-        color: white;
+        color: white !important;
+    }
+    
+    [data-testid="stSidebar"] .stRadio > div > div > label {
+        color: white !important;
     }
     
     [data-testid="stSidebar"] h2 {
-        color: white;
+        color: white !important;
+    }
+    
+    [data-testid="stSidebar"] p {
+        color: #94a3b8 !important;
+    }
+    
+    [data-testid="stSidebar"] .stMarkdown p {
+        color: #94a3b8 !important;
+    }
+    
+    [data-testid="stSidebar"] .stMarkdown h2 {
+        color: white !important;
+    }
+    
+    [data-testid="stSidebar"] .stMarkdown h3 {
+        color: white !important;
+    }
+    
+    [data-testid="stSidebar"] label {
+        color: white !important;
+    }
+    
+    [data-testid="stSidebar"] .stSelectbox label {
+        color: white !important;
+    }
+    
+    [data-testid="stSidebar"] .stTextInput label {
+        color: white !important;
     }
     
     /* Info Boxes */
