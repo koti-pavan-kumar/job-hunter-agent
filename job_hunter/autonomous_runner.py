@@ -39,11 +39,7 @@ def run_job_search():
     try:
         keywords = config.preferences.keywords
         
-        # Search all free API sources
-        all_jobs = job_search_api.search_all_sources(
-            keywords=keywords,
-            location="India"
-        )
+        all_jobs = job_search_api.search_all_sources(keywords)
         
         stats["jobs_found"] = len(all_jobs)
         print(f"\nTotal jobs found: {len(all_jobs)}")
@@ -61,7 +57,6 @@ def run_job_search():
         if all_jobs:
             job_search_api.save_jobs_to_json(all_jobs)
             
-            # Count new jobs
             existing_jobs = job_search_api.get_jobs_from_json()
             new_count = sum(1 for j in existing_jobs if j.get("status") == "new")
             stats["new_jobs"] = new_count
@@ -85,7 +80,6 @@ def run_job_search():
         
         for job in new_jobs[:config.preferences.max_applications_per_day]:
             try:
-                # Assess fit
                 fit_score = _assess_job_fit(job)
                 
                 if fit_score < 4:
@@ -93,7 +87,6 @@ def run_job_search():
                     job["status"] = "low_fit"
                     continue
                 
-                # Generate resume
                 print(f"  Generating resume for {job['title']} at {job['company']}...")
                 
                 resume_result = resume_generator.generate_tailored_resume(
@@ -102,20 +95,17 @@ def run_job_search():
                     job_description=job["description"]
                 )
                 
-                # Save resume
                 company_clean = job["company"].replace(" ", "_").replace("/", "_")[:30]
                 title_clean = job["title"].replace(" ", "_").replace("/", "_")[:30]
                 job_folder = resumes_dir / f"{company_clean}_{title_clean}"
                 job_folder.mkdir(exist_ok=True)
                 
-                # Save resume text
                 resume_content = resume_result.get("resume_content", {})
                 resume_text = format_resume_text(resume_content)
                 
                 with open(job_folder / "resume.txt", "w", encoding="utf-8") as f:
                     f.write(resume_text)
                 
-                # Save job details
                 with open(job_folder / "job_details.txt", "w", encoding="utf-8") as f:
                     f.write(f"Job Title: {job['title']}\n")
                     f.write(f"Company: {job['company']}\n")
@@ -124,11 +114,9 @@ def run_job_search():
                     f.write(f"Fit Score: {fit_score}/10\n")
                     f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
                 
-                # Save job description
                 with open(job_folder / "job_description.txt", "w", encoding="utf-8") as f:
                     f.write(f"=== JOB DESCRIPTION ===\n\n{job['description']}\n")
                 
-                # Mark as processed
                 job["status"] = "processed"
                 stats["resumes_generated"] += 1
                 
@@ -138,7 +126,6 @@ def run_job_search():
                 print(f"  Error generating resume: {e}")
                 stats["errors"].append(f"Resume error: {e}")
         
-        # Save updated jobs
         job_search_api.save_jobs_to_json(all_jobs)
         
     except Exception as e:
@@ -156,12 +143,8 @@ def run_job_search():
     print(f"  - Resumes Generated: {stats['resumes_generated']}")
     if stats["errors"]:
         print(f"  - Errors: {len(stats['errors'])}")
-    print(f"\nFiles:")
-    print(f"  - Jobs: job_hunter/data/jobs.json")
-    print(f"  - Resumes: job_hunter/resumes/")
     print(f"{'='*70}\n")
     
-    # Save stats
     stats_file = Path(__file__).parent / "data" / "search_stats.json"
     stats_file.parent.mkdir(exist_ok=True)
     with open(stats_file, "w") as f:
