@@ -1,5 +1,6 @@
 """
 Job Hunter Agent - Professional Web Interface
+Reads from JSON data files (populated by GitHub Actions)
 """
 import streamlit as st
 import pandas as pd
@@ -8,6 +9,9 @@ from pathlib import Path
 import json
 import plotly.express as px
 import plotly.graph_objects as go
+import requests
+import base64
+import io
 
 # Page config
 st.set_page_config(
@@ -20,15 +24,12 @@ st.set_page_config(
 # Professional CSS Styling
 st.markdown("""
 <style>
-    /* Import Google Fonts */
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
     
-    /* Global Styles */
     .stApp {
         font-family: 'Inter', sans-serif;
     }
     
-    /* Main Header */
     .main-header {
         background: linear-gradient(135deg, #1a56db 0%, #7c3aed 100%);
         padding: 2rem;
@@ -52,7 +53,6 @@ st.markdown("""
         margin-top: 0.5rem;
     }
     
-    /* Metric Cards */
     .metric-card {
         background: white;
         padding: 1.5rem;
@@ -90,7 +90,6 @@ st.markdown("""
         margin-top: 0.5rem;
     }
     
-    /* Section Headers */
     .section-header {
         color: #1e293b;
         font-size: 1.5rem;
@@ -101,7 +100,6 @@ st.markdown("""
         display: inline-block;
     }
     
-    /* Cards */
     .custom-card {
         background: white;
         padding: 1.5rem;
@@ -111,69 +109,6 @@ st.markdown("""
         border: 1px solid rgba(0,0,0,0.05);
     }
     
-    /* Buttons */
-    .stButton > button {
-        background: linear-gradient(135deg, #1a56db 0%, #7c3aed 100%);
-        color: white;
-        border: none;
-        padding: 0.8rem 2rem;
-        border-radius: 10px;
-        font-weight: 600;
-        transition: all 0.3s ease;
-        box-shadow: 0 4px 15px rgba(26, 86, 219, 0.3);
-    }
-    
-    .stButton > button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(26, 86, 219, 0.4);
-    }
-    
-    /* Sidebar Styling */
-    [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
-    }
-    
-    [data-testid="stSidebar"] .stRadio > label {
-        color: white !important;
-    }
-    
-    [data-testid="stSidebar"] .stRadio > div > div > label {
-        color: white !important;
-    }
-    
-    [data-testid="stSidebar"] h2 {
-        color: white !important;
-    }
-    
-    [data-testid="stSidebar"] p {
-        color: #94a3b8 !important;
-    }
-    
-    [data-testid="stSidebar"] .stMarkdown p {
-        color: #94a3b8 !important;
-    }
-    
-    [data-testid="stSidebar"] .stMarkdown h2 {
-        color: white !important;
-    }
-    
-    [data-testid="stSidebar"] .stMarkdown h3 {
-        color: white !important;
-    }
-    
-    [data-testid="stSidebar"] label {
-        color: white !important;
-    }
-    
-    [data-testid="stSidebar"] .stSelectbox label {
-        color: white !important;
-    }
-    
-    [data-testid="stSidebar"] .stTextInput label {
-        color: white !important;
-    }
-    
-    /* Info Boxes */
     .info-box {
         background: linear-gradient(135deg, #dbeafe 0%, #e0e7ff 100%);
         padding: 1rem 1.5rem;
@@ -198,52 +133,6 @@ st.markdown("""
         margin: 1rem 0;
     }
     
-    /* Table Styling */
-    .stDataFrame {
-        border-radius: 10px;
-        overflow: hidden;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-    }
-    
-    /* Tabs */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-    }
-    
-    .stTabs [data-baseweb="tab"] {
-        padding: 10px 20px;
-        border-radius: 10px 10px 0 0;
-    }
-    
-    /* Expander */
-    .streamlit-expanderHeader {
-        background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-        border-radius: 10px;
-        padding: 1rem;
-        font-weight: 600;
-    }
-    
-    /* Footer */
-    .footer {
-        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-        color: white;
-        padding: 2rem;
-        border-radius: 15px;
-        margin-top: 3rem;
-        text-align: center;
-    }
-    
-    .footer h3 {
-        color: #1a56db;
-        margin-bottom: 1rem;
-    }
-    
-    .footer p {
-        color: #94a3b8;
-        font-size: 0.9rem;
-    }
-    
-    /* Feature Cards */
     .feature-card {
         background: white;
         padding: 1.5rem;
@@ -274,7 +163,6 @@ st.markdown("""
         font-size: 0.9rem;
     }
     
-    /* Status Badges */
     .status-badge {
         display: inline-block;
         padding: 0.3rem 0.8rem;
@@ -284,71 +172,67 @@ st.markdown("""
         text-transform: uppercase;
     }
     
-    .status-new {
-        background: #dbeafe;
-        color: #1a56db;
+    .status-new { background: #dbeafe; color: #1a56db; }
+    .status-processed { background: #dcfce7; color: #22c55e; }
+    .status-skipped { background: #fee2e2; color: #ef4444; }
+    .status-low_fit { background: #fef3c7; color: #f59e0b; }
+    
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
     }
     
-    .status-processed {
-        background: #dcfce7;
-        color: #22c55e;
+    [data-testid="stSidebar"] .stRadio > label,
+    [data-testid="stSidebar"] .stRadio > div > div > label,
+    [data-testid="stSidebar"] p,
+    [data-testid="stSidebar"] .stMarkdown p,
+    [data-testid="stSidebar"] label,
+    [data-testid="stSidebar"] .stSelectbox label,
+    [data-testid="stSidebar"] .stTextInput label {
+        color: white !important;
     }
     
-    .status-skipped {
-        background: #fee2e2;
-        color: #ef4444;
+    [data-testid="stSidebar"] h2,
+    [data-testid="stSidebar"] .stMarkdown h2,
+    [data-testid="stSidebar"] .stMarkdown h3 {
+        color: white !important;
     }
+    
+    .footer {
+        background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 15px;
+        margin-top: 3rem;
+        text-align: center;
+    }
+    
+    .footer h3 { color: #1a56db; margin-bottom: 1rem; }
+    .footer p { color: #94a3b8; font-size: 0.9rem; }
 </style>
 """, unsafe_allow_html=True)
 
-def load_config():
-    """Load configuration"""
-    config_path = Path("job_hunter/data/config.json")
-    if config_path.exists():
-        with open(config_path, "r") as f:
-            return json.load(f)
-    return {}
 
 def load_jobs():
-    """Load jobs from database"""
-    import sqlite3
-    db_path = Path("job_hunter/data/jobs.db")
+    """Load jobs from JSON file"""
+    jobs_file = Path("job_hunter/data/jobs.json")
     
-    if not db_path.exists():
-        return pd.DataFrame()
+    if not jobs_file.exists():
+        return []
     
-    conn = sqlite3.connect(db_path)
-    query = "SELECT * FROM job_listings ORDER BY scraped_date DESC"
-    df = pd.read_sql_query(query, conn)
-    conn.close()
-    return df
+    with open(jobs_file, "r") as f:
+        return json.load(f)
 
-def load_statistics():
-    """Load statistics from database"""
-    import sqlite3
-    db_path = Path("job_hunter/data/jobs.db")
+
+def load_stats():
+    """Load search statistics"""
+    stats_file = Path("job_hunter/data/search_stats.json")
     
-    if not db_path.exists():
+    if not stats_file.exists():
         return {}
     
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-    
-    stats = {}
-    cursor.execute("SELECT COUNT(*) FROM job_listings")
-    stats["total_jobs"] = cursor.fetchone()[0]
-    
-    cursor.execute("SELECT COUNT(*) FROM job_listings WHERE status = 'new'")
-    stats["new_jobs"] = cursor.fetchone()[0]
-    
-    cursor.execute("SELECT COUNT(*) FROM job_listings WHERE status = 'processed'")
-    stats["processed_jobs"] = cursor.fetchone()[0]
-    
-    cursor.execute("SELECT platform, COUNT(*) FROM job_listings GROUP BY platform")
-    stats["jobs_by_platform"] = dict(cursor.fetchall())
-    
-    conn.close()
-    return stats
+    with open(stats_file, "r") as f:
+        return json.load(f)
+
 
 def get_generated_resumes():
     """Get list of generated resumes"""
@@ -359,16 +243,77 @@ def get_generated_resumes():
     resumes = []
     for folder in resumes_path.iterdir():
         if folder.is_dir():
-            resume_files = list(folder.glob("resume.txt"))
-            if resume_files:
+            resume_file = folder / "resume.txt"
+            if resume_file.exists():
+                job_details_file = folder / "job_details.txt"
+                job_desc_file = folder / "job_description.txt"
+                
+                job_info = {}
+                if job_details_file.exists():
+                    with open(job_details_file, "r") as f:
+                        for line in f:
+                            if ":" in line:
+                                key, value = line.split(":", 1)
+                                job_info[key.strip()] = value.strip()
+                
                 resumes.append({
                     "folder": folder.name,
                     "path": str(folder),
                     "has_resume": True,
-                    "has_cover_letter": (folder / "cover_letter.txt").exists(),
-                    "has_job_details": (folder / "job_details.txt").exists()
+                    "has_job_details": job_details_file.exists(),
+                    "has_job_description": job_desc_file.exists(),
+                    "job_info": job_info
                 })
+    
     return resumes
+
+
+def text_to_pdf(text: str) -> bytes:
+    """Convert text to PDF using reportlab"""
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import inch
+        from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+        from reportlab.lib.enums import TA_CENTER, TA_LEFT
+        
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4, 
+                               rightMargin=72, leftMargin=72,
+                               topMargin=72, bottomMargin=72)
+        
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=16,
+            textColor='#1a56db',
+            spaceAfter=12
+        )
+        normal_style = ParagraphStyle(
+            'CustomNormal',
+            parent=styles['Normal'],
+            fontSize=10,
+            spaceAfter=6
+        )
+        
+        elements = []
+        
+        for line in text.split('\n'):
+            if line.strip():
+                if line.isupper() or (len(line) < 50 and line.replace(' ', '').replace('&', '').replace('=', '').isalpha()):
+                    elements.append(Paragraph(line.strip(), title_style))
+                else:
+                    elements.append(Paragraph(line.strip(), normal_style))
+            else:
+                elements.append(Spacer(1, 6))
+        
+        doc.build(elements)
+        return buffer.getvalue()
+        
+    except ImportError:
+        return None
+
 
 def main():
     """Main application"""
@@ -384,22 +329,23 @@ def main():
         
         st.markdown("---")
         
-        # Navigation
         page = st.radio(
             "Navigation",
-            ["📊 Dashboard", "💼 Job Listings", "📄 Generated Resumes", "⚙️ Settings", "🚀 Agent Control"],
+            ["📊 Dashboard", "💼 Job Listings", "📄 Generated Resumes", "⚙️ Settings", "ℹ️ How It Works"],
             label_visibility="collapsed"
         )
         
         st.markdown("---")
         
         # Quick Stats
-        stats = load_statistics()
-        st.markdown("""
+        jobs = load_jobs()
+        new_count = sum(1 for j in jobs if j.get("status") == "new")
+        
+        st.markdown(f"""
         <div style="background: rgba(255,255,255,0.1); padding: 1rem; border-radius: 10px;">
             <p style="color: #94a3b8; font-size: 0.8rem; margin: 0;">Quick Stats</p>
-            <h3 style="color: white; margin: 0.5rem 0;">""" + str(stats.get("total_jobs", 0)) + """ Jobs</h3>
-            <p style="color: #22c55e; font-size: 0.85rem; margin: 0;">""" + str(stats.get("new_jobs", 0)) + """ New</p>
+            <h3 style="color: white; margin: 0.5rem 0;">{len(jobs)} Jobs</h3>
+            <p style="color: #22c55e; font-size: 0.85rem; margin: 0;">{new_count} New</p>
         </div>
         """, unsafe_allow_html=True)
     
@@ -412,13 +358,13 @@ def main():
         show_generated_resumes()
     elif page == "⚙️ Settings":
         show_settings()
-    elif page == "🚀 Agent Control":
-        show_agent_control()
+    elif page == "ℹ️ How It Works":
+        show_how_it_works()
+
 
 def show_dashboard():
     """Show professional dashboard"""
     
-    # Header
     st.markdown("""
     <div class="main-header">
         <h1>🎯 Job Hunter Agent</h1>
@@ -426,44 +372,48 @@ def show_dashboard():
     </div>
     """, unsafe_allow_html=True)
     
-    # Load statistics
-    stats = load_statistics()
+    jobs = load_jobs()
+    stats = load_stats()
+    resumes = get_generated_resumes()
+    
+    new_count = sum(1 for j in jobs if j.get("status") == "new")
+    processed_count = sum(1 for j in jobs if j.get("status") == "processed")
     
     # Metrics Row
     col1, col2, col3, col4 = st.columns(4)
     
     with col1:
-        st.markdown("""
+        st.markdown(f"""
         <div class="metric-card">
             <h3>Total Jobs</h3>
-            <h1>""" + str(stats.get("total_jobs", 0)) + """</h1>
+            <h1>{len(jobs)}</h1>
             <p>All jobs found</p>
         </div>
         """, unsafe_allow_html=True)
     
     with col2:
-        st.markdown("""
+        st.markdown(f"""
         <div class="metric-card">
             <h3>New Jobs</h3>
-            <h1>""" + str(stats.get("new_jobs", 0)) + """</h1>
-            <p>Ready to process</p>
+            <h1>{new_count}</h1>
+            <p>Ready to review</p>
         </div>
         """, unsafe_allow_html=True)
     
     with col3:
-        st.markdown("""
+        st.markdown(f"""
         <div class="metric-card">
             <h3>Processed</h3>
-            <h1>""" + str(stats.get("processed_jobs", 0)) + """</h1>
+            <h1>{processed_count}</h1>
             <p>Resumes generated</p>
         </div>
         """, unsafe_allow_html=True)
     
     with col4:
-        st.markdown("""
+        st.markdown(f"""
         <div class="metric-card">
             <h3>Resumes</h3>
-            <h1>""" + str(len(get_generated_resumes())) + """</h1>
+            <h1>{len(resumes)}</h1>
             <p>Ready to download</p>
         </div>
         """, unsafe_allow_html=True)
@@ -474,15 +424,25 @@ def show_dashboard():
     col1, col2 = st.columns(2)
     
     with col1:
-        st.markdown('<h3 class="section-header">📊 Jobs by Platform</h3>', unsafe_allow_html=True)
+        st.markdown('<h3 class="section-header">📊 Jobs by Status</h3>', unsafe_allow_html=True)
         
-        jobs_by_platform = stats.get("jobs_by_platform", {})
+        status_counts = {}
+        for job in jobs:
+            status = job.get("status", "unknown")
+            status_counts[status] = status_counts.get(status, 0) + 1
         
-        if jobs_by_platform:
+        if status_counts:
+            colors = {
+                "new": "#1a56db",
+                "processed": "#22c55e",
+                "low_fit": "#f59e0b",
+                "skipped": "#ef4444"
+            }
             fig = px.pie(
-                values=list(jobs_by_platform.values()),
-                names=list(jobs_by_platform.keys()),
-                color_discrete_sequence=['#1a56db', '#7c3aed', '#22c55e', '#f59e0b'],
+                values=list(status_counts.values()),
+                names=list(status_counts.keys()),
+                color=list(status_counts.keys()),
+                color_discrete_map=colors,
                 hole=0.4
             )
             fig.update_layout(
@@ -494,44 +454,50 @@ def show_dashboard():
             )
             st.plotly_chart(fig, use_container_width=True)
         else:
-            st.markdown("""
-            <div class="info-box">
-                <p>📊 No data available yet. Start the agent to begin collecting jobs.</p>
-            </div>
-            """, unsafe_allow_html=True)
+            st.info("📊 No data yet. Jobs will appear here after the first search.")
     
     with col2:
-        st.markdown('<h3 class="section-header">📈 Recent Activity</h3>', unsafe_allow_html=True)
+        st.markdown('<h3 class="section-header">📈 Jobs by Platform</h3>', unsafe_allow_html=True)
         
-        # Sample activity data
-        activity_data = pd.DataFrame({
-            'Time': ['8:00 AM', '6:00 PM', '8:00 AM', '6:00 PM'],
-            'Action': ['Search', 'Search', 'Generate', 'Generate'],
-            'Count': [15, 12, 8, 6]
-        })
+        platform_counts = {}
+        for job in jobs:
+            platform = job.get("platform", "Unknown")
+            platform_counts[platform] = platform_counts.get(platform, 0) + 1
         
-        fig = px.bar(
-            activity_data,
-            x='Time',
-            y='Count',
-            color='Action',
-            color_discrete_sequence=['#1a56db', '#22c55e'],
-            barmode='group'
-        )
-        fig.update_layout(
-            height=300,
-            margin=dict(t=20, b=20, l=20, r=20),
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)',
-            xaxis=dict(showgrid=False),
-            yaxis=dict(showgrid=True, gridcolor='rgba(0,0,0,0.05)')
-        )
-        st.plotly_chart(fig, use_container_width=True)
+        if platform_counts:
+            fig = px.bar(
+                x=list(platform_counts.keys()),
+                y=list(platform_counts.values()),
+                color=list(platform_counts.keys()),
+                color_discrete_sequence=['#1a56db', '#7c3aed', '#22c55e', '#f59e0b'],
+            )
+            fig.update_layout(
+                height=300,
+                margin=dict(t=20, b=20, l=20, r=20),
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)',
+                showlegend=False
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("📊 Platform data will appear after the first search.")
     
+    # Last search info
+    if stats:
+        st.markdown("---")
+        st.markdown('<h3 class="section-header">🕐 Last Search</h3>', unsafe_allow_html=True)
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Last Search", stats.get("timestamp", "Never")[:19])
+        with col2:
+            st.metric("Jobs Found", stats.get("jobs_found", 0))
+        with col3:
+            st.metric("Resumes Generated", stats.get("resumes_generated", 0))
+    
+    # Features
     st.markdown("---")
-    
-    # Features Section
-    st.markdown('<h3 class="section-header">✨ Key Features</h3>', unsafe_allow_html=True)
+    st.markdown('<h3 class="section-header">✨ What This Agent Does</h3>', unsafe_allow_html=True)
     
     col1, col2, col3, col4 = st.columns(4)
     
@@ -540,7 +506,7 @@ def show_dashboard():
         <div class="feature-card">
             <div class="icon">🔍</div>
             <h4>Smart Search</h4>
-            <p>Automatically searches LinkedIn, Naukri, Internshala, and Google Jobs</p>
+            <p>Automatically searches for AI/ML/Data Science jobs at 8 AM & 6 PM daily</p>
         </div>
         """, unsafe_allow_html=True)
     
@@ -557,17 +523,17 @@ def show_dashboard():
         st.markdown("""
         <div class="feature-card">
             <div class="icon">✅</div>
-            <h4>Legitimacy Check</h4>
-            <p>Filters out scams and fake companies automatically</p>
+            <h4>Fit Assessment</h4>
+            <p>Automatically filters jobs based on your skills and preferences</p>
         </div>
         """, unsafe_allow_html=True)
     
     with col4:
         st.markdown("""
         <div class="feature-card">
-            <div class="icon">📬</div>
-            <h4>Cover Letters</h4>
-            <p>Creates professional cover letters for each application</p>
+            <div class="icon">🎯</div>
+            <h4>Zero Effort</h4>
+            <p>Just check the dashboard and apply to the ones you like</p>
         </div>
         """, unsafe_allow_html=True)
     
@@ -575,13 +541,14 @@ def show_dashboard():
     st.markdown("""
     <div class="footer">
         <h3>🎯 Job Hunter Agent</h3>
-        <p>Autonomous Job Search System | Powered by AI</p>
-        <p>Searches at 8:00 AM and 6:00 PM daily</p>
+        <p>Autonomous Job Search System | Powered by GitHub Actions</p>
+        <p>Searches at 8:00 AM and 6:00 PM IST daily</p>
     </div>
     """, unsafe_allow_html=True)
 
+
 def show_job_listings():
-    """Show job listings with professional styling"""
+    """Show job listings"""
     
     st.markdown("""
     <div class="main-header">
@@ -590,13 +557,13 @@ def show_job_listings():
     </div>
     """, unsafe_allow_html=True)
     
-    # Load jobs
-    df_jobs = load_jobs()
+    jobs = load_jobs()
     
-    if df_jobs.empty:
+    if not jobs:
         st.markdown("""
         <div class="info-box">
-            <p>📋 No jobs found yet. Start the agent to begin collecting jobs.</p>
+            <p>📋 No jobs found yet. The agent will search at 8 AM and 6 PM IST daily.</p>
+            <p>Jobs will appear here automatically after the first search.</p>
         </div>
         """, unsafe_allow_html=True)
         return
@@ -609,102 +576,114 @@ def show_job_listings():
     with col1:
         status_filter = st.selectbox(
             "Status",
-            ["All", "new", "processed", "applied", "skipped", "low_fit"]
+            ["All", "new", "processed", "low_fit", "skipped"]
         )
     
     with col2:
-        platform_filter = st.selectbox(
-            "Platform",
-            ["All"] + list(df_jobs["platform"].unique())
-        )
+        search_term = st.text_input("🔍 Search (Company/Title)")
     
     with col3:
-        search_term = st.text_input("Search (Company/Title)")
+        sort_by = st.selectbox("Sort by", ["Newest", "Company", "Title"])
     
     # Apply filters
-    filtered_df = df_jobs.copy()
+    filtered = jobs.copy()
     
     if status_filter != "All":
-        filtered_df = filtered_df[filtered_df["status"] == status_filter]
-    
-    if platform_filter != "All":
-        filtered_df = filtered_df[filtered_df["platform"] == platform_filter]
+        filtered = [j for j in filtered if j.get("status") == status_filter]
     
     if search_term:
-        mask = (
-            filtered_df["company"].str.contains(search_term, case=False, na=False) |
-            filtered_df["title"].str.contains(search_term, case=False, na=False)
-        )
-        filtered_df = filtered_df[mask]
+        search_lower = search_term.lower()
+        filtered = [j for j in filtered if 
+                    search_lower in j.get("title", "").lower() or
+                    search_lower in j.get("company", "").lower()]
     
-    # Display results
-    st.markdown(f'<h3 class="section-header">📋 Found {len(filtered_df)} Jobs</h3>', unsafe_allow_html=True)
+    if sort_by == "Newest":
+        filtered.sort(key=lambda x: x.get("scraped_date", ""), reverse=True)
+    elif sort_by == "Company":
+        filtered.sort(key=lambda x: x.get("company", ""))
+    elif sort_by == "Title":
+        filtered.sort(key=lambda x: x.get("title", ""))
     
-    if not filtered_df.empty:
-        # Create styled dataframe
-        display_df = filtered_df[["title", "company", "location", "platform", "status", "scraped_date"]].copy()
-        display_df.columns = ["Job Title", "Company", "Location", "Platform", "Status", "Scraped"]
+    st.markdown(f'<h3 class="section-header">📋 Found {len(filtered)} Jobs</h3>', unsafe_allow_html=True)
+    
+    if filtered:
+        # Create dataframe for display
+        display_data = []
+        for job in filtered:
+            status = job.get("status", "unknown")
+            display_data.append({
+                "Title": job.get("title", ""),
+                "Company": job.get("company", ""),
+                "Location": job.get("location", ""),
+                "Status": status,
+                "Platform": job.get("platform", ""),
+            })
         
-        st.dataframe(
-            display_df,
-            use_container_width=True,
-            height=400
-        )
+        df = pd.DataFrame(display_data)
+        st.dataframe(df, use_container_width=True, height=400)
         
         # Job Details
         st.markdown('<h3 class="section-header">📝 Job Details</h3>', unsafe_allow_html=True)
         
-        selected_job = st.selectbox(
+        selected_title = st.selectbox(
             "Select a job to view details",
-            filtered_df["id"].tolist(),
-            format_func=lambda x: f"{filtered_df[filtered_df['id']==x]['title'].iloc[0]} at {filtered_df[filtered_df['id']==x]['company'].iloc[0]}"
+            [f"{j.get('title', '')} at {j.get('company', '')}" for j in filtered]
         )
         
-        if selected_job:
-            job = filtered_df[filtered_df["id"] == selected_job].iloc[0]
+        if selected_title:
+            # Find the job
+            selected_job = None
+            for j in filtered:
+                if f"{j.get('title', '')} at {j.get('company', '')}" == selected_title:
+                    selected_job = j
+                    break
             
-            col1, col2 = st.columns(2)
-            
-            with col1:
+            if selected_job:
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.markdown("""
+                    <div class="custom-card">
+                        <h4 style="color: #1a56db;">Job Information</h4>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    st.write("**Title:**", selected_job.get("title", ""))
+                    st.write("**Company:**", selected_job.get("company", ""))
+                    st.write("**Location:**", selected_job.get("location", ""))
+                    st.write("**Platform:**", selected_job.get("platform", ""))
+                    st.write("**Status:**", selected_job.get("status", ""))
+                
+                with col2:
+                    st.markdown("""
+                    <div class="custom-card">
+                        <h4 style="color: #1a56db;">Application Details</h4>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    st.write("**URL:**", selected_job.get("url", ""))
+                    st.write("**Salary:**", selected_job.get("salary", "Not specified"))
+                    st.write("**Job Type:**", selected_job.get("job_type", ""))
+                    st.write("**Posted:**", selected_job.get("posted_date", ""))
+                
                 st.markdown("""
                 <div class="custom-card">
-                    <h4 style="color: #1a56db;">Job Information</h4>
+                    <h4 style="color: #1a56db;">Job Description</h4>
                 </div>
                 """, unsafe_allow_html=True)
                 
-                st.write("**Title:**", job["title"])
-                st.write("**Company:**", job["company"])
-                st.write("**Location:**", job["location"])
-                st.write("**Platform:**", job["platform"])
-            
-            with col2:
-                st.markdown("""
-                <div class="custom-card">
-                    <h4 style="color: #1a56db;">Application Details</h4>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                st.write("**Status:**", job["status"])
-                st.write("**URL:**", job["url"])
-                st.write("**Scraped:**", job["scraped_date"])
-            
-            st.markdown("""
-            <div class="custom-card">
-                <h4 style="color: #1a56db;">Job Description</h4>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            st.text_area("Description", job["description"], height=300, disabled=True)
+                st.text_area("Description", selected_job.get("description", ""), height=300, disabled=True)
     else:
         st.warning("No jobs match the selected filters.")
 
+
 def show_generated_resumes():
-    """Show generated resumes with professional styling"""
+    """Show generated resumes"""
     
     st.markdown("""
     <div class="main-header">
         <h1>📄 Generated Resumes</h1>
-        <p>View and download your tailored resumes and cover letters</p>
+        <p>View and download your tailored resumes</p>
     </div>
     """, unsafe_allow_html=True)
     
@@ -713,127 +692,110 @@ def show_generated_resumes():
     if not resumes:
         st.markdown("""
         <div class="info-box">
-            <p>📄 No resumes generated yet. Start the agent to begin generating resumes.</p>
+            <p>📄 No resumes generated yet.</p>
+            <p>Resumes will appear here automatically after the agent finds matching jobs.</p>
         </div>
         """, unsafe_allow_html=True)
         return
     
-    st.markdown(f'<div class="success-box"><p>✅ {len(resumes)} resumes generated!</p></div>', unsafe_allow_html=True)
+    st.success(f"✅ {len(resumes)} resumes ready for download!")
     
-    # Display resumes
     for resume in resumes:
-        with st.expander(f"📁 {resume['folder']}", expanded=False):
-            col1, col2, col3, col4 = st.columns(4)
+        job_info = resume.get("job_info", {})
+        title = job_info.get("Job Title", resume["folder"])
+        company = job_info.get("Company", "")
+        
+        with st.expander(f"📁 {title} - {company}", expanded=False):
+            
+            # Job info
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.write("**Fit Score:**", job_info.get("Fit Score", "N/A"))
+            with col2:
+                st.write("**Generated:**", job_info.get("Generated", "N/A"))
+            with col3:
+                st.write("**Status:**", job_info.get("Status", "new"))
+            
+            st.markdown("---")
+            
+            # Read and display resume
+            resume_path = Path(resume["path"]) / "resume.txt"
+            cover_letter_path = Path(resume["path"]) / "cover_letter.txt"
+            job_desc_path = Path(resume["path"]) / "job_description.txt"
+            
+            # Resume content
+            if resume_path.exists():
+                with open(resume_path, "r", encoding="utf-8") as f:
+                    resume_content = f.read()
+                
+                st.markdown('<h4 style="color: #1a56db;">📄 Resume</h4>', unsafe_allow_html=True)
+                st.text_area("Resume", resume_content, height=400, disabled=True, key=f"resume_{resume['folder']}")
+            
+            # Cover letter
+            if cover_letter_path.exists():
+                with open(cover_letter_path, "r", encoding="utf-8") as f:
+                    cover_letter = f.read()
+                
+                st.markdown('<h4 style="color: #1a56db;">✉️ Cover Letter</h4>', unsafe_allow_html=True)
+                st.text_area("Cover Letter", cover_letter, height=300, disabled=True, key=f"cl_{resume['folder']}")
+            
+            # Download buttons
+            st.markdown('<h4 style="color: #1a56db;">⬇️ Download</h4>', unsafe_allow_html=True)
+            
+            col1, col2, col3 = st.columns(3)
             
             with col1:
-                st.write("📄 Resume")
-                st.write("✅" if resume["has_resume"] else "❌")
+                if resume_path.exists():
+                    with open(resume_path, "r", encoding="utf-8") as f:
+                        content = f.read()
+                    st.download_button(
+                        label="📥 Download Resume (TXT)",
+                        data=content,
+                        file_name=f"resume_{resume['folder']}.txt",
+                        mime="text/plain",
+                        use_container_width=True
+                    )
             
             with col2:
-                st.write("✉️ Cover Letter")
-                st.write("✅" if resume["has_cover_letter"] else "❌")
-            
-            with col3:
-                st.write("📋 Job Details")
-                st.write("✅" if resume["has_job_details"] else "❌")
-            
-            with col4:
-                if st.button(f"👁️ View", key=f"view_{resume['folder']}"):
-                    st.session_state.selected_resume = resume["folder"]
-            
-            # Show resume content if selected
-            if st.session_state.get("selected_resume") == resume["folder"]:
-                st.markdown("---")
-                
-                # Read and display resume
-                resume_path = Path(resume["path"]) / "resume.txt"
                 if resume_path.exists():
-                    with open(resume_path, "r") as f:
-                        resume_content = f.read()
-                    
-                    st.markdown('<h4 class="section-header">📄 Resume Content</h4>', unsafe_allow_html=True)
-                    st.text_area("Resume", resume_content, height=500, disabled=True)
-                
-                # Read and display cover letter
-                cover_letter_path = Path(resume["path"]) / "cover_letter.txt"
-                if cover_letter_path.exists():
-                    with open(cover_letter_path, "r") as f:
-                        cover_letter_content = f.read()
-                    
-                    st.markdown('<h4 class="section-header">✉️ Cover Letter</h4>', unsafe_allow_html=True)
-                    st.text_area("Cover Letter", cover_letter_content, height=400, disabled=True)
-                
-                # Download buttons
-                st.markdown('<h4 class="section-header">⬇️ Download</h4>', unsafe_allow_html=True)
-                
-                col1, col2, col3, col4 = st.columns(4)
-                
-                with col1:
-                    if resume_path.exists():
-                        with open(resume_path, "r") as f:
-                            st.download_button(
-                                label="📥 TXT",
-                                data=f.read(),
-                                file_name=f"resume_{resume['folder']}.txt",
-                                mime="text/plain",
-                                use_container_width=True
-                            )
-                
-                with col2:
-                    if resume_path.exists():
-                        with open(resume_path, "r") as f:
-                            resume_content = f.read()
-                        from job_hunter.pdf_converter import pdf_converter
-                        pdf_bytes = pdf_converter.convert_text_to_pdf(resume_content)
+                    with open(resume_path, "r", encoding="utf-8") as f:
+                        content = f.read()
+                    pdf_bytes = text_to_pdf(content)
+                    if pdf_bytes:
                         st.download_button(
-                            label="📄 PDF",
+                            label="📄 Download Resume (PDF)",
                             data=pdf_bytes,
                             file_name=f"resume_{resume['folder']}.pdf",
                             mime="application/pdf",
                             use_container_width=True
                         )
-                
-                with col3:
-                    if cover_letter_path.exists():
-                        with open(cover_letter_path, "r") as f:
-                            st.download_button(
-                                label="📥 TXT",
-                                data=f.read(),
-                                file_name=f"cover_letter_{resume['folder']}.txt",
-                                mime="text/plain",
-                                use_container_width=True
-                            )
-                
-                with col4:
-                    if cover_letter_path.exists():
-                        with open(cover_letter_path, "r") as f:
-                            cover_letter_content = f.read()
-                        from job_hunter.pdf_converter import pdf_converter
-                        pdf_bytes = pdf_converter.convert_text_to_pdf(cover_letter_content)
-                        st.download_button(
-                            label="📄 PDF",
-                            data=pdf_bytes,
-                            file_name=f"cover_letter_{resume['folder']}.pdf",
-                            mime="application/pdf",
-                            use_container_width=True
-                        )
+                    else:
+                        st.info("PDF generation requires reportlab")
+            
+            with col3:
+                if job_desc_path.exists():
+                    with open(job_desc_path, "r", encoding="utf-8") as f:
+                        content = f.read()
+                    st.download_button(
+                        label="📋 Download Job Description",
+                        data=content,
+                        file_name=f"job_desc_{resume['folder']}.txt",
+                        mime="text/plain",
+                        use_container_width=True
+                    )
+
 
 def show_settings():
-    """Show settings with professional styling"""
+    """Show settings"""
     
     st.markdown("""
     <div class="main-header">
         <h1>⚙️ Settings</h1>
-        <p>Configure your profile and job search preferences</p>
+        <p>Configure your job search preferences</p>
     </div>
     """, unsafe_allow_html=True)
     
-    config = load_config()
-    
-    # Personal Information
-    st.markdown('<h3 class="section-header">👤 Personal Information</h3>', unsafe_allow_html=True)
-    
-    personal = config.get("personal_profile", {})
+    st.markdown('<h3 class="section-header">👤 Your Profile</h3>', unsafe_allow_html=True)
     
     col1, col2 = st.columns(2)
     
@@ -844,9 +806,9 @@ def show_settings():
         </div>
         """, unsafe_allow_html=True)
         
-        name = st.text_input("Name", personal.get("name", ""))
-        email = st.text_input("Email", personal.get("email", ""))
-        phone = st.text_input("Phone", personal.get("phone", ""))
+        st.text_input("Name", "Pavan Kumar Koti", disabled=True)
+        st.text_input("Email", "kotipavankumar12@gmail.com", disabled=True)
+        st.text_input("Phone", "+91 7893600187", disabled=True)
     
     with col2:
         st.markdown("""
@@ -855,177 +817,122 @@ def show_settings():
         </div>
         """, unsafe_allow_html=True)
         
-        linkedin = st.text_input("LinkedIn URL", personal.get("linkedin_url", ""))
-        github = st.text_input("GitHub URL", personal.get("github_url", ""))
-        location = st.text_input("Location", personal.get("location", ""))
+        st.text_input("LinkedIn", "linkedin.com/in/pavan-kumar-koti-200b4438b", disabled=True)
+        st.text_input("GitHub", "github.com/koti-pavan-kumar/", disabled=True)
+        st.text_input("Location", "Ongole, Andhra Pradesh, India", disabled=True)
     
     st.markdown("---")
+    st.markdown('<h3 class="section-header">🔍 Search Preferences</h3>', unsafe_allow_html=True)
     
-    # Job Preferences
-    st.markdown('<h3 class="section-header">💼 Job Preferences</h3>', unsafe_allow_html=True)
+    st.info("💡 Search preferences are configured in the GitHub repository. Edit `job_hunter/config.py` to change keywords or locations.")
     
-    preferences = config.get("preferences", {})
+    st.markdown("""
+    <div class="custom-card">
+        <h4 style="color: #1a56db;">Current Search Keywords</h4>
+        <p>AI, ML, Machine Learning, Data Science, Python, Data Analyst, SWE</p>
+    </div>
+    """, unsafe_allow_html=True)
     
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.markdown("""
-        <div class="custom-card">
-            <h4 style="color: #1a56db;">Search Keywords</h4>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        keywords = st.text_area(
-            "Keywords (one per line)",
-            "\n".join(preferences.get("keywords", [])),
-            height=150
-        )
-    
-    with col2:
-        st.markdown("""
-        <div class="custom-card">
-            <h4 style="color: #1a56db;">Preferred Locations</h4>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        locations = st.text_area(
-            "Locations (one per line)",
-            "\n".join(preferences.get("locations", [])),
-            height=150
-        )
-    
-    max_apps = st.slider(
-        "Max applications per day",
-        min_value=1,
-        max_value=50,
-        value=preferences.get("max_applications_per_day", 10)
-    )
-    
-    # Save button
-    st.markdown("---")
-    
-    if st.button("💾 Save Settings", use_container_width=True):
-        st.success("✅ Settings saved successfully!")
-        st.balloons()
+    st.markdown("""
+    <div class="custom-card">
+        <h4 style="color: #1a56db;">Preferred Locations</h4>
+        <p>Remote, Bangalore, Hyderabad, Chennai, Pune</p>
+    </div>
+    """, unsafe_allow_html=True)
 
-def show_agent_control():
-    """Show agent control with professional styling"""
+
+def show_how_it_works():
+    """Show how the agent works"""
     
     st.markdown("""
     <div class="main-header">
-        <h1>🚀 Agent Control</h1>
-        <p>Start and manage the autonomous job hunting agent</p>
+        <h1>ℹ️ How It Works</h1>
+        <p>Understanding the autonomous job hunting agent</p>
     </div>
     """, unsafe_allow_html=True)
     
-    # How it works
-    st.markdown('<h3 class="section-header">ℹ️ How It Works</h3>', unsafe_allow_html=True)
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.markdown("""
-        <div class="feature-card">
-            <div class="icon">🔍</div>
-            <h4>1. Search</h4>
-            <p>Agent searches LinkedIn, Naukri, Internshala, and Google Jobs for matching opportunities</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown("""
-        <div class="feature-card">
-            <div class="icon">📝</div>
-            <h4>2. Generate</h4>
-            <p>Creates tailored resumes and cover letters for each matching job</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col3:
-        st.markdown("""
-        <div class="feature-card">
-            <div class="icon">✅</div>
-            <h4>3. Apply</h4>
-            <p>Review generated materials and apply when you have time</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    st.markdown("---")
-    
-    # Agent Status
-    st.markdown('<h3 class="section-header">📊 Agent Status</h3>', unsafe_allow_html=True)
-    
-    if st.session_state.get("agent_running", False):
-        st.markdown("""
-        <div class="success-box">
-            <p>✅ <strong>Agent is running!</strong> Next search scheduled for 8:00 AM and 6:00 PM daily.</p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        if st.button("⏹️ Stop Agent", use_container_width=True):
-            st.session_state.agent_running = False
-            st.rerun()
-    else:
-        st.markdown("""
-        <div class="warning-box">
-            <p>⚠️ <strong>Agent is not running.</strong> Click below to start autonomous job hunting.</p>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        if st.button("🚀 Start Agent", type="primary", use_container_width=True):
-            st.session_state.agent_running = True
-            st.success("✅ Agent started! It will search at 8:00 AM and 6:00 PM daily.")
-            st.info("💡 You can close this window. The agent will run in the background.")
-    
-    st.markdown("---")
-    
-    # Manual Search
-    st.markdown('<h3 class="section-header">🔍 Manual Search</h3>', unsafe_allow_html=True)
+    st.markdown('<h3 class="section-header">🤖 Architecture</h3>', unsafe_allow_html=True)
     
     st.markdown("""
-    <div class="info-box">
-        <p>Run a one-time search right now to find new job opportunities.</p>
+    <div class="custom-card">
+        <h4 style="color: #1a56db;">The System</h4>
+        <p>This agent uses a 3-part architecture:</p>
+        <ol>
+            <li><strong>GitHub Actions</strong> - Runs the search automatically at 8 AM and 6 PM IST</li>
+            <li><strong>Adzuna API</strong> - Real job search API (not web scraping)</li>
+            <li><strong>Streamlit</strong> - This web interface to view results</li>
+        </ol>
     </div>
     """, unsafe_allow_html=True)
     
-    if st.button("🔍 Run Search Now", use_container_width=True):
-        with st.spinner("🔍 Searching for jobs..."):
-            import time
-            time.sleep(2)
-            st.success("✅ Search completed! Check the Job Listings page.")
-    
-    st.markdown("---")
-    
-    # Schedule
     st.markdown('<h3 class="section-header">📅 Schedule</h3>', unsafe_allow_html=True)
     
     col1, col2 = st.columns(2)
     
     with col1:
         st.markdown("""
-        <div class="custom-card">
-            <h4 style="color: #1a56db;">🌅 Morning Search</h4>
-            <p style="font-size: 2rem; font-weight: bold; color: #1a56db;">8:00 AM</p>
-            <p>Daily morning search for new jobs</p>
+        <div class="feature-card">
+            <div class="icon">🌅</div>
+            <h4>Morning Search</h4>
+            <p><strong>8:00 AM IST</strong></p>
+            <p>Searches for new AI/ML/Data Science jobs</p>
         </div>
         """, unsafe_allow_html=True)
     
     with col2:
         st.markdown("""
-        <div class="custom-card">
-            <h4 style="color: #7c3aed;">🌆 Evening Search</h4>
-            <p style="font-size: 2rem; font-weight: bold; color: #7c3aed;">6:00 PM</p>
-            <p>Daily evening search for new jobs</p>
+        <div class="feature-card">
+            <div class="icon">🌆</div>
+            <h4>Evening Search</h4>
+            <p><strong>6:00 PM IST</strong></p>
+            <p>Finds more opportunities throughout the day</p>
         </div>
         """, unsafe_allow_html=True)
+    
+    st.markdown('<h3 class="section-header">📊 What Happens Each Run</h3>', unsafe_allow_html=True)
+    
+    steps = [
+        ("🔍", "Search", "Finds jobs matching your skills from Adzuna API"),
+        ("✅", "Filter", "Assesses fit score (1-10) based on keywords"),
+        ("📝", "Generate", "Creates tailored resume for jobs with fit score 4+"),
+        ("📁", "Save", "Saves jobs and resumes to the repository"),
+        ("🔄", "Commit", "Pushes results back to GitHub automatically")
+    ]
+    
+    cols = st.columns(len(steps))
+    for i, (icon, title, desc) in enumerate(steps):
+        with cols[i]:
+            st.markdown(f"""
+            <div class="feature-card">
+                <div class="icon">{icon}</div>
+                <h4>{title}</h4>
+                <p>{desc}</p>
+            </div>
+            """, unsafe_allow_html=True)
+    
+    st.markdown('<h3 class="section-header">🎯 Your Daily Workflow</h3>', unsafe_allow_html=True)
+    
+    st.markdown("""
+    <div class="success-box">
+        <h4 style="margin-top: 0;">All You Need To Do:</h4>
+        <ol>
+            <li>🌅 <strong>Morning:</strong> Check this dashboard (2 minutes)</li>
+            <li>📄 <strong>Review:</strong> Look at generated resumes</li>
+            <li>✅ <strong>Apply:</strong> Apply to jobs you like (when you have time)</li>
+        </ol>
+        <p><strong>That's it! The agent does everything else.</strong></p>
+    </div>
+    """, unsafe_allow_html=True)
     
     # Footer
     st.markdown("""
     <div class="footer">
         <h3>🎯 Job Hunter Agent</h3>
-        <p>Let the agent work for you! Just review and apply when you have time.</p>
+        <p>Fully autonomous job hunting | Powered by GitHub Actions</p>
+        <p>Searches at 8:00 AM and 6:00 PM IST daily</p>
     </div>
     """, unsafe_allow_html=True)
+
 
 if __name__ == "__main__":
     main()
