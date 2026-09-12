@@ -1,0 +1,186 @@
+{
+  "name": "Job Hunter Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * *"
+            },
+            {
+              "field": "cronExpression",
+              "expression": "0 18 * * *"
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "8AM & 6PM IST Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "url": "https://www.arbeitnow.com/api/job-board-api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "search", "value": "python machine learning" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "arbeitnow-search",
+      "name": "Search Arbeitnow",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [300, 0]
+    },
+    {
+      "parameters": {
+        "url": "https://remotive.com/api/remote-jobs",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "search", "value": "python machine learning" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "remotive-search",
+      "name": "Search Remotive",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [300, 200]
+    },
+    {
+      "parameters": {
+        "url": "https://jobicy.com/api/v2/remote-jobs",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "count", "value": "50" },
+            { "name": "tag", "value": "python" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "jobicy-search",
+      "name": "Search Jobicy",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [300, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "const jobs = [];\n\n// Process Arbeitnow jobs\nif ($input.first().json.data) {\n  for (const job of $input.first().json.data) {\n    const title = job.title || '';\n    const desc = job.description || '';\n    const text = (title + ' ' + desc).toLowerCase();\n    \n    // Check if relevant to skills\n    const skillKeywords = ['python', 'machine learning', 'data science', 'ai', 'ml', 'deep learning', 'nlp', 'data analyst', 'software engineer', 'developer', 'intern', 'internship', 'fresher', 'junior', 'backend', 'frontend', 'langchain', 'llm'];\n    \n    const excludeKeywords = ['tax', 'accounting', 'finance', 'manufacturing', 'hr', 'sales', 'marketing', 'operations', 'legal', 'insurance'];\n    \n    const hasSkill = skillKeywords.some(kw => text.includes(kw));\n    const hasExclude = excludeKeywords.some(kw => text.includes(kw));\n    \n    // Check location - India or Remote only\n    const location = (job.location || '').toLowerCase();\n    const remote = job.remote;\n    const indiaKeywords = ['india', 'bangalore', 'hyderabad', 'chennai', 'pune', 'mumbai', 'delhi', 'remote', 'worldwide', 'global'];\n    const isGoodLocation = remote || indiaKeywords.some(kw => location.includes(kw));\n    \n    if (hasSkill && !hasExclude && isGoodLocation) {\n      jobs.push({\n        title: title,\n        company: job.company_name || 'Unknown',\n        location: job.location || 'Remote',\n        url: job.url || '',\n        description: desc.substring(0, 500),\n        platform: 'Arbeitnow',\n        salary: job.salary || '',\n        job_type: title.toLowerCase().includes('intern') ? 'internship' : 'full-time'\n      });\n    }\n  }\n}\n\n// Process Remotive jobs\nif ($input.first().json.jobs) {\n  for (const job of $input.first().json.jobs) {\n    const title = job.title || '';\n    const desc = job.description || '';\n    const text = (title + ' ' + desc).toLowerCase();\n    \n    const skillKeywords = ['python', 'machine learning', 'data science', 'ai', 'ml', 'deep learning', 'nlp', 'data analyst', 'software engineer', 'developer', 'intern', 'internship', 'fresher', 'junior', 'backend', 'frontend', 'langchain', 'llm'];\n    const excludeKeywords = ['tax', 'accounting', 'finance', 'manufacturing', 'hr', 'sales', 'marketing', 'operations', 'legal', 'insurance'];\n    \n    const hasSkill = skillKeywords.some(kw => text.includes(kw));\n    const hasExclude = excludeKeywords.some(kw => text.includes(kw));\n    \n    if (hasSkill && !hasExclude) {\n      jobs.push({\n        title: title,\n        company: job.company_name || 'Unknown',\n        location: job.candidate_required_location || 'Remote',\n        url: job.url || '',\n        description: desc.substring(0, 500),\n        platform: 'Remotive',\n        job_type: title.toLowerCase().includes('intern') ? 'internship' : 'full-time'\n      });\n    }\n  }\n}\n\n// Process Jobicy jobs\nif ($input.first().json.jobs) {\n  for (const job of $input.first().json.jobs) {\n    const title = job.jobTitle || '';\n    const desc = job.jobDescription || '';\n    const text = (title + ' ' + desc).toLowerCase();\n    \n    const skillKeywords = ['python', 'machine learning', 'data science', 'ai', 'ml', 'deep learning', 'nlp', 'data analyst', 'software engineer', 'developer', 'intern', 'internship', 'fresher', 'junior', 'backend', 'frontend', 'langchain', 'llm'];\n    const excludeKeywords = ['tax', 'accounting', 'finance', 'manufacturing', 'hr', 'sales', 'marketing', 'operations', 'legal', 'insurance'];\n    \n    const hasSkill = skillKeywords.some(kw => text.includes(kw));\n    const hasExclude = excludeKeywords.some(kw => text.includes(kw));\n    \n    if (hasSkill && !hasExclude) {\n      jobs.push({\n        title: title,\n        company: job.companyName || 'Unknown',\n        location: job.jobGeo || 'Remote',\n        url: job.url || '',\n        description: desc.substring(0, 500),\n        platform: 'Jobicy',\n        job_type: title.toLowerCase().includes('intern') ? 'internship' : 'full-time'\n      });\n    }\n  }\n}\n\nreturn jobs.map(job => ({ json: job }));"
+      },
+      "id": "filter-jobs",
+      "name": "Filter Relevant Jobs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [600, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "const jobs = $input.all().map(item => item.json);\nconst uniqueJobs = [];\nconst seenUrls = new Set();\n\nfor (const job of jobs) {\n  if (job.url && !seenUrls.has(job.url)) {\n    seenUrls.add(job.url);\n    uniqueJobs.push(job);\n  }\n}\n\nreturn uniqueJobs.map(job => ({ json: job }));"
+      },
+      "id": "deduplicate",
+      "name": "Remove Duplicates",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [800, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "const jobs = $input.all().map(item => item.json);\nconst results = [];\n\nfor (const job of jobs) {\n  const title = job.title || '';\n  const desc = job.description || '';\n  const text = (title + ' ' + desc).toLowerCase();\n  \n  let score = 5;\n  \n  // Good keywords increase score\n  const goodKw = ['python', 'machine learning', 'ai', 'data science', 'deep learning', 'nlp', 'intern', 'fresher', 'junior', 'langchain', 'llm'];\n  for (const kw of goodKw) {\n    if (text.includes(kw)) score += 1;\n  }\n  \n  // Bad keywords decrease score\n  const badKw = ['operations', 'cybersecurity', 'finance', 'data entry', 'annotation'];\n  for (const kw of badKw) {\n    if (text.includes(kw)) score -= 2;\n  }\n  \n  // Bonus for intern/junior\n  if (title.toLowerCase().includes('intern')) score += 1;\n  if (title.toLowerCase().includes('junior') || title.toLowerCase().includes('fresher')) score += 1;\n  \n  score = Math.max(1, Math.min(10, score));\n  \n  // Only keep jobs with score >= 4\n  if (score >= 4) {\n    results.push({\n      ...job,\n      fit_score: score,\n      generated_at: new Date().toISOString()\n    });\n  }\n}\n\nreturn results.map(r => ({ json: r }));"
+      },
+      "id": "score-jobs",
+      "name": "Score Job Fit",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1000, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{$json.url}}",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": []
+        },
+        "options": {}
+      },
+      "id": "save-to-sheet",
+      "name": "Save to Google Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.1,
+      "position": [1200, 200],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "REPLACE_WITH_YOUR_SHEET_CREDENTIAL_ID",
+          "name": "Google Sheets"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "kotipavankumar12@gmail.com",
+        "subject": "Job Hunter Agent - New Jobs Found!",
+        "emailType": "html",
+        "message": "<h2>Job Hunter Agent Found New Jobs!</h2><p>Found {{ $input.all().length }} new jobs matching your skills.</p><h3>Jobs Found:</h3><ul>{{ $input.all().map(job => '<li><strong>' + job.json.title + '</strong> at ' + job.json.company + ' (' + job.json.platform + ')</li>').join('') }}</ul><p>Login to your dashboard to view details and download resumes.</p>"
+      },
+      "id": "send-email",
+      "name": "Send Email Notification",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [1200, 400],
+      "credentials": {
+        "smtp": {
+          "id": "REPLACE_WITH_YOUR_SMTP_CREDENTIAL_ID",
+          "name": "Gmail SMTP"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "8AM & 6PM IST Schedule": {
+      "main": [
+        [
+          { "node": "Search Arbeitnow", "type": "main", "index": 0 },
+          { "node": "Search Remotive", "type": "main", "index": 0 },
+          { "node": "Search Jobicy", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Search Arbeitnow": {
+      "main": [[{ "node": "Filter Relevant Jobs", "type": "main", "index": 0 }]]
+    },
+    "Search Remotive": {
+      "main": [[{ "node": "Filter Relevant Jobs", "type": "main", "index": 0 }]]
+    },
+    "Search Jobicy": {
+      "main": [[{ "node": "Filter Relevant Jobs", "type": "main", "index": 0 }]]
+    },
+    "Filter Relevant Jobs": {
+      "main": [[{ "node": "Remove Duplicates", "type": "main", "index": 0 }]]
+    },
+    "Remove Duplicates": {
+      "main": [[{ "node": "Score Job Fit", "type": "main", "index": 0 }]]
+    },
+    "Score Job Fit": {
+      "main": [
+        [
+          { "node": "Save to Google Sheet", "type": "main", "index": 0 },
+          { "node": "Send Email Notification", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
